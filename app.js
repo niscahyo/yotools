@@ -1,5 +1,5 @@
 /* ============================================================
-   sugi-tools clone — app.js
+   yotools clone — app.js
    Flow-based web scraper / AI design document generator
    ============================================================ */
 
@@ -676,7 +676,7 @@ $('btn-export-all').addEventListener('click', () => {
   if (state.output.mdRaw)      bundle += '=== DESIGN.md ===\n' + state.output.mdRaw + '\n\n';
   if (state.output.htmlSource) bundle += '=== page.html ===\n' + state.output.htmlSource + '\n\n';
   if (state.output.aiPrompt)   bundle += '=== ai_prompt.txt ===\n' + state.output.aiPrompt + '\n\n';
-  downloadFile('sugi-tools-export.txt', bundle, 'text/plain');
+  downloadFile('yotools-export.txt', bundle, 'text/plain');
   toast('Export berhasil!', 'success');
 });
 
@@ -1169,7 +1169,7 @@ async function generateDesignDoc(url, results) {
   const now = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
 
   let design = `# DESIGN.md — ${title}\n\n`;
-  design += `> Dibuat otomatis oleh sugi-tools pada ${now}\n> Sumber: ${canonical}\n\n`;
+  design += `> Dibuat otomatis oleh yotools pada ${now}\n> Sumber: ${canonical}\n\n`;
   design += `---\n\n`;
 
   // Overview
@@ -1955,7 +1955,7 @@ function generateSkillsMd(url, skills, results) {
   const levelLabel = { beginner: 'Pemula', intermediate: 'Menengah', advanced: 'Mahir' };
 
   let md = `# SKILLS.md — Rekomendasi Skill untuk Clone ${hostname}\n\n`;
-  md += `> Dibuat otomatis oleh sugi-tools pada ${now}  \n`;
+  md += `> Dibuat otomatis oleh yotools pada ${now}  \n`;
   md += `> Berdasarkan analisis tech stack dari: ${url}\n\n`;
   md += `---\n\n`;
 
