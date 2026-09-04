@@ -315,23 +315,24 @@ document.addEventListener('mousemove', e => {
   }
 });
 
-document.addEventListener('mouseup', e => {
+document.addEventListener('mouseup', () => {
   state.dragging = null;
-  if (state.connecting) {
-    cancelConnecting();
-  }
 });
 
 // ─── Edge / Connection Logic ──────────────────────────────────
 function getPortCenter(nodeId, portType) {
   const node = state.nodes.find(n => n.id === nodeId);
   if (!node) return { x: 0, y: 0 };
+  const portEl = node.el.querySelector(`.port-${portType}`);
+  if (!portEl) return { x: 0, y: 0 };
 
-  // Use local canvas coordinates. Screen rectangles already contain zoom/pan and
-  // caused the SVG transform to be applied twice, making edges appear to wobble.
+  // Convert the actual circle center from viewport space back into the shared
+  // local coordinate system used by both nodesContainer and edgesSvg.
+  const canvasRect = canvas.getBoundingClientRect();
+  const portRect = portEl.getBoundingClientRect();
   return {
-    x: node.x + (portType === 'out' ? node.el.offsetWidth : 0),
-    y: node.y + node.el.offsetHeight / 2,
+    x: (portRect.left + portRect.width / 2 - canvasRect.left) / state.zoom - state.panX,
+    y: (portRect.top + portRect.height / 2 - canvasRect.top) / state.zoom - state.panY,
   };
 }
 
