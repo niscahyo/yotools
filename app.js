@@ -180,8 +180,8 @@ function createNode(type, x, y) {
 
   el.innerHTML = `
     <div class="node-ports">
-      ${def.hasIn  ? `<div class="port port-in"  data-port="in"  data-node="${id}"></div>` : ''}
-      ${def.hasOut ? `<div class="port port-out" data-port="out" data-node="${id}"></div>` : ''}
+      ${def.hasIn  ? `<button class="port port-in" type="button" data-port="in" data-node="${id}" title="Input: klik untuk menerima koneksi" aria-label="Input ${def.label}"></button>` : ''}
+      ${def.hasOut ? `<button class="port port-out" type="button" data-port="out" data-node="${id}" title="Output: klik lalu pilih input node tujuan" aria-label="Output ${def.label}"></button>` : ''}
     </div>
     <div class="node-header">
       <div class="node-type-icon" style="background:${def.color}22; color:${def.color}">${def.icon}</div>
@@ -223,17 +223,16 @@ function createNode(type, x, y) {
     showContextMenu(e.clientX, e.clientY, id);
   });
 
-  // Port: start connecting
+  // Click/tap the output port, then click/tap an input port.
   el.querySelectorAll('.port').forEach(port => {
-    port.addEventListener('mousedown', e => {
+    port.addEventListener('mousedown', e => e.stopPropagation());
+    port.addEventListener('click', e => {
+      e.preventDefault();
       e.stopPropagation();
       if (port.dataset.port === 'out') {
-        startConnecting(id, e);
-      }
-    });
-    port.addEventListener('mouseup', e => {
-      e.stopPropagation();
-      if (port.dataset.port === 'in' && state.connecting) {
+        if (state.connecting?.fromId === id) cancelConnecting();
+        else startConnecting(id);
+      } else if (state.connecting) {
         finishConnecting(id);
       }
     });
@@ -327,52 +326,68 @@ document.addEventListener('mouseup', e => {
 function getPortCenter(nodeId, portType) {
   const node = state.nodes.find(n => n.id === nodeId);
   if (!node) return { x: 0, y: 0 };
-  const portEl = node.el.querySelector(`.port-${portType}`);
-  if (!portEl) return { x: 0, y: 0 };
-  const canvasRect = canvas.getBoundingClientRect();
-  const r = portEl.getBoundingClientRect();
+
+  // Use local canvas coordinates. Screen rectangles already contain zoom/pan and
+  // caused the SVG transform to be applied twice, making edges appear to wobble.
   return {
-    x: (r.left + r.width  / 2 - canvasRect.left) / state.zoom,
-    y: (r.top  + r.height / 2 - canvasRect.top)  / state.zoom,
+    x: node.x + (portType === 'out' ? node.el.offsetWidth : 0),
+    y: node.y + node.el.offsetHeight / 2,
   };
 }
 
-function cubicPath(x1, y1, x2, y2) {
-  const cx = (x1 + x2) / 2;
-  return `M ${x1},${y1} C ${cx},${y1} ${cx},${y2} ${x2},${y2}`;
+function connectionPath(x1, y1, x2, y2) {
+  // Stable 2D orthogonal connector: horizontal → vertical → horizontal.
+  const midX = x1 + (x2 - x1) / 2;
+  return `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
+}
+
+function setConnectionTargets(active) {
+  document.querySelectorAll('.port-in').forEach(port => port.classList.toggle('connect-target', active));
 }
 
 function startConnecting(fromId, e) {
-  e.preventDefault();
+  e?.preventDefault();
+  cancelConnecting();
   const p = getPortCenter(fromId, 'out');
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   path.classList.add('flow-edge', 'temp');
-  path.setAttribute('d', cubicPath(p.x, p.y, p.x, p.y));
+  path.setAttribute('d', connectionPath(p.x, p.y, p.x, p.y));
   edgesSvg.appendChild(path);
   state.connecting = { fromId, tempPath: path };
+  state.nodes.find(node => node.id === fromId)?.el.querySelector('.port-out')?.classList.add('active');
+  setConnectionTargets(true);
+  toast('Pilih titik input di sisi kiri node tujuan');
 }
 
 function updateTempEdge(mx, my) {
   if (!state.connecting) return;
   const p = getPortCenter(state.connecting.fromId, 'out');
-  state.connecting.tempPath.setAttribute('d', cubicPath(p.x, p.y, mx, my));
+  state.connecting.tempPath.setAttribute('d', connectionPath(p.x, p.y, mx, my));
 }
 
 function finishConnecting(toId) {
   if (!state.connecting) return;
-  const { fromId, tempPath } = state.connecting;
-  tempPath.remove();
-  state.connecting = null;
-  if (fromId === toId) return;
+  const { fromId } = state.connecting;
+  cancelConnecting();
+  if (fromId === toId) {
+    toast('Node tidak bisa dihubungkan ke dirinya sendiri', 'error');
+    return;
+  }
   // Avoid duplicate edges
-  if (state.edges.find(e => e.from === fromId && e.to === toId)) return;
+  if (state.edges.find(e => e.from === fromId && e.to === toId)) {
+    toast('Koneksi tersebut sudah ada', 'error');
+    return;
+  }
   addEdge(fromId, toId);
+  toast('Node berhasil disambungkan', 'success');
 }
 
 function cancelConnecting() {
   if (!state.connecting) return;
   state.connecting.tempPath.remove();
+  state.nodes.find(node => node.id === state.connecting.fromId)?.el.querySelector('.port-out')?.classList.remove('active');
   state.connecting = null;
+  setConnectionTargets(false);
 }
 
 function addEdge(fromId, toId) {
@@ -389,7 +404,7 @@ function addEdge(fromId, toId) {
 function redrawEdge(edge) {
   const p1 = getPortCenter(edge.from, 'out');
   const p2 = getPortCenter(edge.to,   'in');
-  edge.el.setAttribute('d', cubicPath(p1.x, p1.y, p2.x, p2.y));
+  edge.el.setAttribute('d', connectionPath(p1.x, p1.y, p2.x, p2.y));
 }
 
 function redrawEdges() {
