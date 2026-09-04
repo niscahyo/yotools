@@ -149,6 +149,14 @@ a { color: var(--accent); text-decoration: none; }
   flex-direction: column;
   overflow-y: auto;
   flex-shrink: 0;
+  transition: width 0.22s ease, opacity 0.22s ease;
+}
+#sidebar.panel-hidden {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  border-right: none;
+  pointer-events: none;
 }
 
 #sidebar::-webkit-scrollbar { width: 4px; }
@@ -167,7 +175,6 @@ a { color: var(--accent); text-decoration: none; }
   letter-spacing: 0.08em;
   color: var(--text-muted);
   text-transform: uppercase;
-  margin-bottom: 8px;
   padding: 0 2px;
 }
 
@@ -919,6 +926,14 @@ a { color: var(--accent); text-decoration: none; }
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
+  transition: width 0.22s ease, opacity 0.22s ease;
+}
+#output-panel.panel-hidden {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  border-left: none;
+  pointer-events: none;
 }
 
 .output-header {
@@ -1275,3 +1290,155 @@ a { color: var(--accent); text-decoration: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+/* ===== Panel Toggle ===== */
+.sidebar-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+
+.btn-panel-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.12s;
+  cursor: pointer;
+}
+.btn-panel-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+}
+
+/* Arrow rotates when panel is hidden (re-open button floats on canvas edge) */
+#sidebar.panel-hidden + #canvas-wrapper .sidebar-reopen,
+.sidebar-reopen {
+  display: none;
+}
+
+/* Floating re-open buttons when panels are collapsed */
+.panel-reopen-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  width: 20px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s;
+  opacity: 0;
+  pointer-events: none;
+}
+.panel-reopen-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+.panel-reopen-btn.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+#btn-reopen-sidebar { left: 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+#btn-reopen-output  { right: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+
+/* ===== Mobile toggle buttons (hidden on desktop) ===== */
+.btn-mobile-only {
+  display: none;
+}
+
+/* ===== Mobile Overlay ===== */
+.panel-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 149;
+}
+.panel-overlay.active { display: block; }
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 768px) {
+  :root {
+    --header-h: 48px;
+    --sidebar-w: 240px;
+    --output-w: 300px;
+  }
+
+  .btn-mobile-only { display: flex; }
+  .header-title    { display: none; }
+  .header-left, .header-right { min-width: unset; }
+
+  /* Sidebar becomes a fixed left drawer on mobile */
+  #sidebar {
+    position: fixed;
+    left: 0;
+    top: var(--header-h);
+    bottom: 0;
+    z-index: 150;
+    transform: translateX(0);
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    overflow-y: auto;
+    width: var(--sidebar-w) !important;
+    opacity: 1 !important;
+    pointer-events: all !important;
+  }
+  #sidebar.panel-hidden {
+    transform: translateX(-100%);
+    opacity: 1 !important;
+    width: var(--sidebar-w) !important;
+    overflow: hidden;
+    pointer-events: none !important;
+  }
+
+  /* Output panel becomes a fixed right drawer on mobile */
+  #output-panel {
+    position: fixed;
+    right: 0;
+    top: var(--header-h);
+    bottom: 0;
+    z-index: 150;
+    transform: translateX(0);
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    overflow-y: hidden;
+    width: var(--output-w) !important;
+    opacity: 1 !important;
+    pointer-events: all !important;
+  }
+  #output-panel.panel-hidden {
+    transform: translateX(100%);
+    opacity: 1 !important;
+    width: var(--output-w) !important;
+    overflow: hidden;
+    pointer-events: none !important;
+  }
+
+  /* Canvas always takes full width on mobile */
+  #canvas-wrapper { width: 100% !important; }
+
+  /* Floating reopen buttons hidden on mobile — use header buttons instead */
+  .panel-reopen-btn { display: none !important; }
+
+  /* Touch-friendly nodes */
+  .palette-item { padding: 10px 8px; }
+  .flow-node    { min-width: 160px; }
+
+  /* Make output tabs scrollable on small screens */
+  .output-tabs { overflow-x: auto; }
+}

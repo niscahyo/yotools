@@ -619,6 +619,175 @@ $('btn-export-all').addEventListener('click', () => {
 
 $('btn-export-zip').addEventListener('click', () => $('btn-export-all').click());
 
+// ─── Panel Toggle (Sidebar & Output) ──────────────────────────
+
+function createReopenBtn(id, side) {
+  const btn = document.createElement('button');
+  btn.id = id;
+  btn.className = 'panel-reopen-btn';
+  btn.title = side === 'left' ? 'Buka panel Nodes' : 'Buka panel Output';
+  btn.innerHTML = side === 'left'
+    ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`
+    : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`;
+  document.getElementById('canvas-wrapper').appendChild(btn);
+  return btn;
+}
+
+const reopenSidebarBtn = createReopenBtn('btn-reopen-sidebar', 'left');
+const reopenOutputBtn  = createReopenBtn('btn-reopen-output', 'right');
+
+// Create overlay for mobile
+const overlay = document.createElement('div');
+overlay.className = 'panel-overlay';
+overlay.id = 'panel-overlay';
+document.body.appendChild(overlay);
+
+const isMobile = () => window.innerWidth <= 768;
+
+function setSidebarHidden(hidden) {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('panel-hidden', hidden);
+  reopenSidebarBtn.classList.toggle('visible', hidden && !isMobile());
+  // update toggle button arrow direction
+  const toggleBtn = $('btn-toggle-sidebar');
+  if (toggleBtn) {
+    toggleBtn.innerHTML = hidden
+      ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`
+      : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`;
+  }
+}
+
+function setOutputHidden(hidden) {
+  const panel = document.getElementById('output-panel');
+  panel.classList.toggle('panel-hidden', hidden);
+  reopenOutputBtn.classList.toggle('visible', hidden && !isMobile());
+  const toggleBtn = $('btn-toggle-output');
+  if (toggleBtn) {
+    toggleBtn.innerHTML = hidden
+      ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`
+      : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`;
+  }
+}
+
+function closeAllPanels() {
+  setSidebarHidden(true);
+  setOutputHidden(true);
+  overlay.classList.remove('active');
+}
+
+// Desktop toggle buttons inside panels
+$('btn-toggle-sidebar')?.addEventListener('click', () => {
+  const hidden = !document.getElementById('sidebar').classList.contains('panel-hidden');
+  setSidebarHidden(hidden);
+});
+
+$('btn-toggle-output')?.addEventListener('click', () => {
+  const hidden = !document.getElementById('output-panel').classList.contains('panel-hidden');
+  setOutputHidden(hidden);
+});
+
+// Floating reopen buttons (desktop only)
+reopenSidebarBtn.addEventListener('click', () => setSidebarHidden(false));
+reopenOutputBtn.addEventListener('click',  () => setOutputHidden(false));
+
+// Mobile header toggle buttons
+$('btn-mobile-sidebar')?.addEventListener('click', () => {
+  const sidebar = document.getElementById('sidebar');
+  const isHidden = sidebar.classList.contains('panel-hidden');
+  if (isHidden) {
+    // close output first, open sidebar
+    setOutputHidden(true);
+    setSidebarHidden(false);
+    overlay.classList.add('active');
+  } else {
+    setSidebarHidden(true);
+    overlay.classList.remove('active');
+  }
+});
+
+$('btn-mobile-output')?.addEventListener('click', () => {
+  const panel = document.getElementById('output-panel');
+  const isHidden = panel.classList.contains('panel-hidden');
+  if (isHidden) {
+    // close sidebar first, open output
+    setSidebarHidden(true);
+    setOutputHidden(false);
+    overlay.classList.add('active');
+  } else {
+    setOutputHidden(true);
+    overlay.classList.remove('active');
+  }
+});
+
+// Close panels when overlay is tapped (mobile)
+overlay.addEventListener('click', closeAllPanels);
+
+// On resize: re-sync reopen buttons visibility
+window.addEventListener('resize', () => {
+  const sidebarHidden = document.getElementById('sidebar').classList.contains('panel-hidden');
+  const outputHidden  = document.getElementById('output-panel').classList.contains('panel-hidden');
+  reopenSidebarBtn.classList.toggle('visible', sidebarHidden && !isMobile());
+  reopenOutputBtn.classList.toggle('visible',  outputHidden  && !isMobile());
+  // Hide overlay if switching to desktop
+  if (!isMobile()) overlay.classList.remove('active');
+});
+
+// On mobile, hide both panels by default so canvas is full width
+if (isMobile()) {
+  setSidebarHidden(true);
+  setOutputHidden(true);
+}
+
+// ─── Touch Pan (canvas) ────────────────────────────────────────
+(function initTouchPan() {
+  let touchStartX = 0, touchStartY = 0;
+  let panStartX = 0, panStartY = 0;
+  let lastTouchDist = 0;
+  let isTwoFinger = false;
+
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      isTwoFinger = false;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      panStartX   = state.panX;
+      panStartY   = state.panY;
+    } else if (e.touches.length === 2) {
+      isTwoFinger = true;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastTouchDist = Math.hypot(dx, dy);
+    }
+  }, { passive: true });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && !isTwoFinger) {
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      state.panX = panStartX + dx;
+      state.panY = panStartY + dy;
+      applyTransform();
+      redrawEdges();
+    } else if (e.touches.length === 2) {
+      // Pinch to zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const delta = dist - lastTouchDist;
+      lastTouchDist = dist;
+      const factor = 1 + delta * 0.005;
+      state.zoom = Math.min(2, Math.max(0.2, state.zoom * factor));
+      applyTransform();
+      redrawEdges();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => {
+    isTwoFinger = false;
+  }, { passive: true });
+})();
+
 function downloadFile(name, content, mime) {
   const blob = new Blob([content], { type: mime });
   const url  = URL.createObjectURL(blob);
