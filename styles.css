@@ -1471,6 +1471,35 @@ a { color: var(--accent); text-decoration: none; }
   .palette-item { padding: 10px 8px; }
   .flow-node    { min-width: 160px; }
 
-  /* Make output tabs scrollable on small screens */
-  .output-tabs { overflow-x: auto; }
+  /* Two-row output header keeps the More dropdown outside scroll clipping. */
+  .output-header {
+    position: relative;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 4px 6px 0;
+    overflow: visible;
+  }
+  #btn-toggle-output { grid-column: 1; grid-row: 1; }
+  #btn-copy-output {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .output-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    overflow: visible;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .tab-btn { padding: 7px 8px; }
+  .tab-more-wrap { margin-left: auto; }
+  .tab-dropdown {
+    top: calc(100% + 2px);
+    right: 0;
+    z-index: 1000;
+  }
 }
