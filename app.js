@@ -759,17 +759,58 @@ async function executePipeline(url, pipeline) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ─── Fetchers (use allorigins.win CORS proxy) ─────────────────
-async function fetchHTML(url) {
-  try {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    return json.contents || '';
-  } catch (e) {
-    return `<!-- Gagal mengambil HTML: ${e.message} -->`;
+// ─── Fetchers (multi-proxy with fallback) ─────────────────────
+
+// Try fetching a raw blob/text via multiple CORS proxies in order.
+// Returns a Response-like { ok, blob(), text() } from the first that succeeds.
+const CORS_PROXIES_RAW = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+async function fetchRawWithFallback(url, timeoutMs = 12000) {
+  let lastErr;
+  for (const proxyFn of CORS_PROXIES_RAW) {
+    try {
+      const res = await fetch(proxyFn(url), { signal: AbortSignal.timeout(timeoutMs) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // allorigins /raw may return an empty body for some sites — check blob size
+      const blob = await res.blob();
+      if (blob.size === 0) throw new Error('Response kosong');
+      return blob;
+    } catch (e) {
+      lastErr = e;
+    }
   }
+  throw lastErr || new Error('Semua proxy gagal');
+}
+
+async function fetchHTML(url) {
+  // Try allorigins /get (returns JSON with .contents) first, then fall back to raw proxies
+  const proxies = [
+    async () => {
+      const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json.contents) throw new Error('Response kosong');
+      return json.contents;
+    },
+    async () => {
+      const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.text();
+    },
+    async () => {
+      const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.text();
+    },
+  ];
+  for (const fn of proxies) {
+    try { return await fn(); } catch {}
+  }
+  return `<!-- Gagal mengambil HTML dari semua proxy -->`;
 }
 
 async function fetchMarkdown(url) {
@@ -1347,41 +1388,22 @@ async function fetchAllAssets(pageUrl, html, typesStr, maxSizeKB) {
     try {
       const filename = filenameFromUrl(asset.url);
 
-      if (asset.type === 'img') {
-        // Images: don't proxy — use the direct URL as objectUrl.
-        // Browsers can display cross-origin images natively.
-        // We mark size as unknown (0) since we don't fetch the blob.
-        fetched.push({
-          ...asset,
-          ok: true,
-          blob: null,
-          objectUrl: asset.url,   // direct URL — no proxy needed
-          size: 0,
-          filename,
-          mimeType: guessMime('img', filename),
-          direct: true,           // flag: no blob, use direct URL for download
-        });
-      } else {
-        // CSS / JS / fonts: fetch via proxy to get blob for ZIP bundling
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(asset.url)}`;
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        if (blob.size === 0) throw new Error('Response kosong');
-        if (blob.size > maxBytes) throw new Error(`Terlalu besar: ${(blob.size/1024).toFixed(0)}KB`);
-        const objectUrl = URL.createObjectURL(blob);
-        _assetObjectURLs.push(objectUrl);
-        fetched.push({
-          ...asset,
-          ok: true,
-          blob,
-          objectUrl,
-          size: blob.size,
-          filename,
-          mimeType: blob.type || guessMime(asset.type, filename),
-          direct: false,
-        });
-      }
+      // Fetch all asset types (including images) via proxy for reliable blob access
+      // and to avoid hotlink protection / CSP issues on the target site.
+      const blob = await fetchRawWithFallback(asset.url, 12000);
+      if (blob.size > maxBytes) throw new Error(`Terlalu besar: ${(blob.size/1024).toFixed(0)}KB`);
+      const objectUrl = URL.createObjectURL(blob);
+      _assetObjectURLs.push(objectUrl);
+      fetched.push({
+        ...asset,
+        ok: true,
+        blob,
+        objectUrl,
+        size: blob.size,
+        filename,
+        mimeType: blob.type || guessMime(asset.type, filename),
+        direct: false,
+      });
     } catch (e) {
       fetched.push({ ...asset, ok: false, error: e.message, size: 0, filename: filenameFromUrl(asset.url) });
     }
@@ -1532,8 +1554,7 @@ document.addEventListener('click', e => {
 
 /**
  * Build a ZIP of all assets.
- * - For blob assets (CSS/JS/fonts): use stored blob directly.
- * - For direct images: fetch them now via allorigins proxy and add to ZIP.
+ * All ok assets already have a blob from fetchRawWithFallback.
  */
 async function buildAndDownloadZip(assets) {
   if (typeof JSZip === 'undefined') {
@@ -1556,22 +1577,8 @@ async function buildAndDownloadZip(assets) {
       const filename = asset.filename || filenameFromUrl(asset.url);
 
       if (asset.blob) {
-        // Already have the blob (CSS/JS/fonts)
         zip.folder(folder).file(filename, asset.blob);
         added++;
-      } else if (asset.direct && asset.url) {
-        // Direct image — fetch via proxy for ZIP inclusion
-        try {
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(asset.url)}`;
-          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-          if (res.ok) {
-            const blob = await res.blob();
-            if (blob.size > 0) {
-              zip.folder(folder).file(filename, blob);
-              added++;
-            }
-          }
-        } catch { /* skip failed images */ }
       }
     }
 
