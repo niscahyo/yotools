@@ -324,13 +324,19 @@ a { color: var(--accent); text-decoration: none; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 2px 12px rgba(0,0,0,0.5);
-  cursor: move;
+  cursor: grab;
   user-select: none;
+  touch-action: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .flow-node:hover {
   border-color: var(--border-bright);
   box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+}
+.flow-node.dragging {
+  cursor: grabbing;
+  z-index: 20;
+  transition: none;
 }
 .flow-node.selected {
   border-color: var(--accent);

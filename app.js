@@ -213,8 +213,9 @@ function createNode(type, x, y) {
     input.addEventListener('mousedown', e => e.stopPropagation());
   });
 
-  // Drag
+  // Drag with mouse or one-finger touch.
   el.addEventListener('mousedown', onNodeMouseDown);
+  el.addEventListener('touchstart', onNodeTouchStart, { passive: false });
 
   // Right-click context menu
   el.addEventListener('contextmenu', e => {
@@ -275,22 +276,38 @@ function deleteNode(id) {
 }
 
 // ─── Dragging Nodes ───────────────────────────────────────────
-function onNodeMouseDown(e) {
-  if (e.target.classList.contains('port')) return;
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  e.preventDefault();
-  const el = e.currentTarget;
+function isNodeDragBlocked(target) {
+  return target.closest('.port, input, textarea, button, a');
+}
+
+function beginNodeDrag(el, clientX, clientY, pointerType = 'mouse') {
   const id = el.dataset.id;
   selectNode(id);
   const node = state.nodes.find(n => n.id === id);
   if (!node) return;
   state.dragging = {
     nodeId: id,
-    startMouseX: e.clientX,
-    startMouseY: e.clientY,
+    startMouseX: clientX,
+    startMouseY: clientY,
     startNodeX: node.x,
     startNodeY: node.y,
+    pointerType,
   };
+  el.classList.add('dragging');
+}
+
+function onNodeMouseDown(e) {
+  if (isNodeDragBlocked(e.target)) return;
+  e.preventDefault();
+  beginNodeDrag(e.currentTarget, e.clientX, e.clientY);
+}
+
+function onNodeTouchStart(e) {
+  if (e.touches.length !== 1 || isNodeDragBlocked(e.target)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const touch = e.touches[0];
+  beginNodeDrag(e.currentTarget, touch.clientX, touch.clientY, 'touch');
 }
 
 document.addEventListener('mousemove', e => {
@@ -316,8 +333,38 @@ document.addEventListener('mousemove', e => {
 });
 
 document.addEventListener('mouseup', () => {
+  if (state.dragging) {
+    state.nodes.find(node => node.id === state.dragging.nodeId)?.el.classList.remove('dragging');
+  }
   state.dragging = null;
 });
+
+document.addEventListener('touchmove', e => {
+  if (!state.dragging || state.dragging.pointerType !== 'touch' || e.touches.length !== 1) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const touch = e.touches[0];
+  const d = state.dragging;
+  const node = state.nodes.find(n => n.id === d.nodeId);
+  if (!node) return;
+  node.x = d.startNodeX + (touch.clientX - d.startMouseX) / state.zoom;
+  node.y = d.startNodeY + (touch.clientY - d.startMouseY) / state.zoom;
+  node.el.style.left = node.x + 'px';
+  node.el.style.top = node.y + 'px';
+  redrawEdges();
+}, { passive: false, capture: true });
+
+document.addEventListener('touchend', () => {
+  if (!state.dragging || state.dragging.pointerType !== 'touch') return;
+  state.nodes.find(node => node.id === state.dragging.nodeId)?.el.classList.remove('dragging');
+  state.dragging = null;
+}, { capture: true });
+
+document.addEventListener('touchcancel', () => {
+  if (!state.dragging || state.dragging.pointerType !== 'touch') return;
+  state.nodes.find(node => node.id === state.dragging.nodeId)?.el.classList.remove('dragging');
+  state.dragging = null;
+}, { capture: true });
 
 // ─── Edge / Connection Logic ──────────────────────────────────
 function getPortCenter(nodeId, portType) {
