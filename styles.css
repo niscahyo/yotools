@@ -2,28 +2,28 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg-base:       #0d0d0d;
-  --bg-surface:    #111111;
-  --bg-elevated:   #1a1a1a;
-  --bg-hover:      #222222;
-  --border:        #2a2a2a;
-  --border-bright: #3a3a3a;
-  --text-primary:  #e8e8e8;
-  --text-secondary:#888888;
-  --text-muted:    #555555;
-  --accent:        #a855f7;
-  --accent-dim:    rgba(168,85,247,0.15);
-  --accent-hover:  #bf7fff;
-  --green:         #22c55e;
-  --red:           #ef4444;
+  --bg-base:       #000000;
+  --bg-surface:    rgba(0,0,0,0.72);
+  --bg-elevated:   rgba(255,255,255,0.055);
+  --bg-hover:      rgba(255,255,255,0.08);
+  --border:        rgba(255,255,255,0.10);
+  --border-bright: rgba(255,255,255,0.20);
+  --text-primary:  #f8fafc;
+  --text-secondary:rgba(255,255,255,0.70);
+  --text-muted:    rgba(255,255,255,0.45);
+  --accent:        #d9f99d;
+  --accent-dim:    rgba(217,249,157,0.12);
+  --accent-hover:  #ecfccb;
+  --green:         #16a34a;
+  --red:           #dc2626;
   --yellow:        #f59e0b;
-  --blue:          #3b82f6;
-  --cyan:          #06b6d4;
-  --node-source:   #a855f7;
-  --node-scrape:   #3b82f6;
-  --node-crawl:    #06b6d4;
-  --node-style:    #f59e0b;
-  --node-ai:       #22c55e;
+  --blue:          #0ea5a4;
+  --cyan:          #14b8a6;
+  --node-source:   rgba(255,255,255,0.75);
+  --node-scrape:   #14b8a6;
+  --node-crawl:    #14b8a6;
+  --node-style:    #14b8a6;
+  --node-ai:       #c084fc;
   --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --radius-sm: 4px;
   --radius: 8px;
@@ -274,9 +274,8 @@ a { color: var(--accent); text-decoration: none; }
   content: '';
   position: absolute;
   inset: 0;
-  background-image:
-    radial-gradient(circle, #2a2a2a 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image: radial-gradient(circle, #334155 1.2px, transparent 1.2px);
+  background-size: 18px 18px;
   pointer-events: none;
   z-index: 0;
 }
@@ -319,15 +318,24 @@ a { color: var(--accent); text-decoration: none; }
 /* ===== Nodes ===== */
 .flow-node {
   position: absolute;
-  min-width: 180px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  min-width: 224px;
+  background: rgba(20,184,166,0.05);
+  border: 2px solid rgba(20,184,166,0.40);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 4px 6px -1px rgba(0,0,0,0.1);
+  backdrop-filter: blur(8px);
   cursor: grab;
   user-select: none;
   touch-action: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+.flow-node[data-type="source-url"] {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.20);
+}
+.flow-node[data-type="ai-design"] {
+  background: rgba(168,85,247,0.10);
+  border-color: rgba(192,132,252,0.50);
 }
 .flow-node:hover {
   border-color: var(--border-bright);
@@ -581,26 +589,30 @@ a { color: var(--accent); text-decoration: none; }
 
 /* Port handles */
 .node-ports {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
+.node-ports .port { pointer-events: auto; }
 .port {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
+  padding: 0;
   border-radius: 50%;
-  border: 2px solid var(--border-bright);
-  background: var(--bg-elevated);
+  border: 2px solid var(--accent);
+  background: #000;
   cursor: crosshair;
-  transition: all 0.12s;
+  transition: transform 0.12s, background 0.12s, box-shadow 0.12s;
   z-index: 10;
 }
 .port:hover, .port.active {
   border-color: var(--accent);
   background: var(--accent);
-  transform: scale(1.3);
+  transform: scale(1.2);
 }
 .port-out {
-  right: -5px;
+  right: -7px;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -608,7 +620,7 @@ a { color: var(--accent); text-decoration: none; }
   transform: translateY(-50%) scale(1.3);
 }
 .port-in {
-  left: -5px;
+  left: -7px;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -638,15 +650,8 @@ a { color: var(--accent); text-decoration: none; }
 }
 .connection-help strong { color: var(--text-primary); }
 
-/* Node-specific accent colors */
-.flow-node[data-type="source-url"] .node-header { border-top: 2px solid var(--node-source); }
-.flow-node[data-type="scrape-md"]  .node-header { border-top: 2px solid var(--node-scrape); }
-.flow-node[data-type="scrape-html"] .node-header { border-top: 2px solid var(--blue); }
-.flow-node[data-type="scrape-img"] .node-header { border-top: 2px solid var(--node-crawl); }
-.flow-node[data-type="crawl"]      .node-header { border-top: 2px solid var(--node-style); }
-.flow-node[data-type="styleguide"] .node-header { border-top: 2px solid var(--yellow); }
-.flow-node[data-type="ai-design"]  .node-header { border-top: 2px solid var(--node-ai); }
-.flow-node[data-type="download-assets"] .node-header { border-top: 2px solid #818cf8; }
+/* Node-specific identity comes from the full tinted border like the reference. */
+.flow-node .node-header { border-top: 0; }
 
 /* ===== Assets Tab ===== */
 .assets-list {
@@ -826,10 +831,10 @@ a { color: var(--accent); text-decoration: none; }
 
 /* ===== Edges / SVG paths ===== */
 .flow-edge {
-  stroke: var(--accent);
-  stroke-width: 2;
+  stroke: rgba(20,184,166,0.60);
+  stroke-width: 1.5;
   fill: none;
-  opacity: 0.8;
+  opacity: 1;
   marker-end: url(#arrowhead);
   vector-effect: non-scaling-stroke;
   shape-rendering: geometricPrecision;
@@ -839,7 +844,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 .flow-edge:hover { opacity: 1; }
 .flow-edge.temp {
-  stroke: var(--accent);
+  stroke: #14b8a6;
   stroke-dasharray: 6 4;
   opacity: 0.65;
   marker-end: none;
@@ -848,19 +853,25 @@ a { color: var(--accent); text-decoration: none; }
 /* ===== Canvas Controls ===== */
 .canvas-controls {
   position: absolute;
-  bottom: 60px;
-  right: 12px;
+  bottom: 12px;
+  left: 12px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 0;
   z-index: 50;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.70);
+  backdrop-filter: blur(6px);
 }
 .ctrl-btn {
-  width: 28px;
-  height: 28px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -933,7 +944,7 @@ a { color: var(--accent); text-decoration: none; }
   align-items: center;
   gap: 6px;
   background: var(--accent);
-  color: #fff;
+  color: #0b132b;
   border: none;
   border-radius: var(--radius-sm);
   padding: 6px 14px;
@@ -1469,7 +1480,7 @@ a { color: var(--accent); text-decoration: none; }
 
   /* Touch-friendly nodes */
   .palette-item { padding: 10px 8px; }
-  .flow-node    { min-width: 160px; }
+  .flow-node    { min-width: 224px; }
 
   /* Two-row output header keeps the More dropdown outside scroll clipping. */
   .output-header {

@@ -31,7 +31,7 @@ const state = {
 const NODE_DEFS = {
   'source-url': {
     label: 'Source URL',
-    color: '#a855f7',
+    color: '#d9f99d',
     icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>`,
     fields: [
       { key: 'url', label: 'URL', type: 'input', placeholder: 'https://example.com' },
@@ -41,7 +41,7 @@ const NODE_DEFS = {
   },
   'scrape-md': {
     label: 'Scrape MD',
-    color: '#3b82f6',
+    color: '#14b8a6',
     icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
     fields: [],
     hasIn: true,
@@ -49,7 +49,7 @@ const NODE_DEFS = {
   },
   'scrape-html': {
     label: 'Scrape HTML',
-    color: '#3b82f6',
+    color: '#14b8a6',
     icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
     fields: [],
     hasIn: true,
@@ -57,7 +57,7 @@ const NODE_DEFS = {
   },
   'scrape-img': {
     label: 'Scrape Images',
-    color: '#06b6d4',
+    color: '#14b8a6',
     icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
     fields: [],
     hasIn: true,
@@ -65,7 +65,7 @@ const NODE_DEFS = {
   },
   'crawl': {
     label: 'Crawl',
-    color: '#f59e0b',
+    color: '#14b8a6',
     icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="13"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="13" x2="5" y2="16"/><line x1="12" y1="13" x2="19" y2="16"/></svg>`,
     fields: [
       { key: 'depth', label: 'Kedalaman', type: 'input', placeholder: '2' },
@@ -76,7 +76,7 @@ const NODE_DEFS = {
   },
   'styleguide': {
     label: 'Styleguide',
-    color: '#f59e0b',
+    color: '#14b8a6',
     icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="10"/></svg>`,
     fields: [],
     hasIn: true,
@@ -84,7 +84,7 @@ const NODE_DEFS = {
   },
   'ai-design': {
     label: 'AI Design',
-    color: '#22c55e',
+    color: '#c084fc',
     icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 8v4l3 3"/><path d="M18 2l4 4-4 4"/><path d="M22 6H14"/></svg>`,
     fields: [
       { key: 'apiKey', label: 'API Key (opsional)', type: 'input', placeholder: 'sk-... (kosongkan untuk gratis)' },
@@ -260,6 +260,7 @@ function selectNode(id) {
 function deleteNode(id) {
   const idx = state.nodes.findIndex(n => n.id === id);
   if (idx === -1) return;
+  if (state.connecting?.fromId === id) cancelConnecting();
   const node = state.nodes[idx];
   node.el.remove();
   state.nodes.splice(idx, 1);
@@ -326,8 +327,8 @@ document.addEventListener('mousemove', e => {
 
   if (state.connecting) {
     const canvasRect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - canvasRect.left) / state.zoom;
-    const my = (e.clientY - canvasRect.top)  / state.zoom;
+    const mx = (e.clientX - canvasRect.left) / state.zoom - state.panX;
+    const my = (e.clientY - canvasRect.top) / state.zoom - state.panY;
     updateTempEdge(mx, my);
   }
 });
@@ -468,25 +469,42 @@ function applyTransform() {
   zoomDisplay.textContent = Math.round(state.zoom * 100) + '%';
 }
 
-function zoomBy(delta) {
-  state.zoom = Math.min(2, Math.max(0.3, state.zoom + delta));
+function zoomBy(factor) {
+  state.zoom = Math.min(2, Math.max(0.3, state.zoom * factor));
   applyTransform();
   redrawEdges();
 }
 
-$('btn-zoom-in').addEventListener('click', () => zoomBy(0.1));
-$('btn-zoom-out').addEventListener('click', () => zoomBy(-0.1));
-$('btn-fit').addEventListener('click', () => {
-  state.zoom = 1;
-  state.panX = 0;
-  state.panY = 0;
+function fitNodesToView() {
+  if (!state.nodes.length) {
+    state.zoom = 1;
+    state.panX = 0;
+    state.panY = 0;
+  } else {
+    const padding = 48;
+    const minX = Math.min(...state.nodes.map(node => node.x));
+    const minY = Math.min(...state.nodes.map(node => node.y));
+    const maxX = Math.max(...state.nodes.map(node => node.x + node.el.offsetWidth));
+    const maxY = Math.max(...state.nodes.map(node => node.y + node.el.offsetHeight));
+    const boundsWidth = Math.max(1, maxX - minX);
+    const boundsHeight = Math.max(1, maxY - minY);
+    const rect = canvas.getBoundingClientRect();
+    state.zoom = Math.min(1, Math.max(0.3,
+      Math.min((rect.width - padding * 2) / boundsWidth, (rect.height - padding * 2) / boundsHeight)));
+    state.panX = (rect.width / state.zoom - boundsWidth) / 2 - minX;
+    state.panY = (rect.height / state.zoom - boundsHeight) / 2 - minY;
+  }
   applyTransform();
   redrawEdges();
-});
+}
+
+$('btn-zoom-in').addEventListener('click', () => zoomBy(1.2));
+$('btn-zoom-out').addEventListener('click', () => zoomBy(1 / 1.2));
+$('btn-fit').addEventListener('click', fitNodesToView);
 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  zoomBy(e.deltaY < 0 ? 0.08 : -0.08);
+  zoomBy(e.deltaY < 0 ? 1.08 : 1 / 1.08);
 }, { passive: false });
 
 // ─── Drag & Drop from Palette ─────────────────────────────────
@@ -500,8 +518,8 @@ document.querySelectorAll('.palette-item').forEach(item => {
   // Click-to-add
   item.addEventListener('click', () => {
     const rect = canvas.getBoundingClientRect();
-    const cx = (rect.width  / 2 - 90) / state.zoom;
-    const cy = (rect.height / 2 - 40) / state.zoom;
+    const cx = (rect.width / 2) / state.zoom - state.panX - 112;
+    const cy = (rect.height / 2) / state.zoom - state.panY - 40;
     createNode(item.dataset.type, cx + Math.random() * 40 - 20, cy + Math.random() * 40 - 20);
     redrawEdges();
   });
@@ -518,8 +536,8 @@ canvas.addEventListener('drop', e => {
   const type = e.dataTransfer.getData('text/plain') || dragType;
   if (!type || !NODE_DEFS[type]) return;
   const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / state.zoom - 90;
-  const y = (e.clientY - rect.top)  / state.zoom - 30;
+  const x = (e.clientX - rect.left) / state.zoom - state.panX - 112;
+  const y = (e.clientY - rect.top) / state.zoom - state.panY - 30;
   createNode(type, Math.max(0, x), Math.max(0, y));
   redrawEdges();
 });
@@ -556,7 +574,12 @@ contextMenu.querySelector('.ctx-duplicate').addEventListener('click', () => {
   const orig = state.nodes.find(n => n.id === ctxTargetId);
   if (!orig) return;
   const copy = createNode(orig.type, orig.x + 30, orig.y + 30);
-  if (copy) Object.assign(copy.data, JSON.parse(JSON.stringify(orig.data)));
+  if (copy) {
+    Object.assign(copy.data, JSON.parse(JSON.stringify(orig.data)));
+    copy.el.querySelectorAll('[data-key]').forEach(input => {
+      input.value = copy.data[input.dataset.key] || '';
+    });
+  }
   hideContextMenu();
 });
 contextMenu.querySelector('.ctx-disconnect').addEventListener('click', () => {
@@ -600,6 +623,7 @@ function activateTab(tabKey) {
   if (regularBtn) {
     regularBtn.classList.add('active');
     moreBtn?.classList.remove('active-child');
+    if (moreBtn) moreBtn.childNodes[0].textContent = 'More ';
   } else if (dropBtn) {
     dropBtn.classList.add('active');
     moreBtn?.classList.add('active-child');
@@ -650,7 +674,7 @@ document.addEventListener('click', e => {
 
 // ─── Copy Button ──────────────────────────────────────────────
 $('btn-copy-output').addEventListener('click', () => {
-  const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+  const activeTab = document.querySelector('.tab-btn.active, .tab-drop-item.active')?.dataset.tab;
   let text = '';
   if (activeTab === 'md-rendered' || activeTab === 'md-raw') text = state.output.mdRaw;
   else if (activeTab === 'html-source') text = state.output.htmlSource;
@@ -658,10 +682,15 @@ $('btn-copy-output').addEventListener('click', () => {
   if (!text) { toast('Tidak ada output untuk disalin', 'error'); return; }
   navigator.clipboard.writeText(text).then(() => {
     const btn = $('btn-copy-output');
+    const labelNode = btn.lastChild;
+    const originalLabel = labelNode.textContent;
     btn.classList.add('copied');
-    btn.querySelector('svg + *') || (btn.lastChild.textContent = ' Copied!');
+    labelNode.textContent = ' Copied!';
     toast('Disalin ke clipboard!', 'success');
-    setTimeout(() => { btn.classList.remove('copied'); }, 1500);
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      labelNode.textContent = originalLabel;
+    }, 1500);
   }).catch(() => toast('Gagal menyalin', 'error'));
 });
 
@@ -672,15 +701,16 @@ $('btn-export-txt').addEventListener('click', () => {
   downloadFile('DESIGN.md', text, 'text/markdown');
 });
 
-$('btn-export-all').addEventListener('click', () => {
+$('btn-export-all').addEventListener('click', async () => {
   if (!state.output.mdRaw && !state.output.htmlSource) { toast('Jalankan pipeline dulu', 'error'); return; }
-  // Simple: download all as a single zip-like bundle (txt with sections)
-  let bundle = '';
-  if (state.output.mdRaw)      bundle += '=== DESIGN.md ===\n' + state.output.mdRaw + '\n\n';
-  if (state.output.htmlSource) bundle += '=== page.html ===\n' + state.output.htmlSource + '\n\n';
-  if (state.output.aiPrompt)   bundle += '=== ai_prompt.txt ===\n' + state.output.aiPrompt + '\n\n';
-  downloadFile('yotools-export.txt', bundle, 'text/plain');
-  toast('Export berhasil!', 'success');
+  if (typeof JSZip === 'undefined') { toast('JSZip tidak tersedia', 'error'); return; }
+  const zip = new JSZip();
+  if (state.output.mdRaw) zip.file('DESIGN.md', state.output.mdRaw);
+  if (state.output.htmlSource) zip.file('page.html', state.output.htmlSource);
+  if (state.output.aiPrompt) zip.file('ai-prompt.txt', state.output.aiPrompt);
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  downloadFile('yotools-export.zip', blob, 'application/zip');
+  toast('Export ZIP berhasil!', 'success');
 });
 
 $('btn-export-zip').addEventListener('click', () => $('btn-export-all').click());
@@ -894,8 +924,15 @@ async function runPipeline() {
     return;
   }
 
-  // Determine pipeline order via BFS from source node
-  const pipeline = buildPipeline(sourceNode.id);
+  // Determine dependency-safe pipeline order and reject cycles.
+  let pipeline;
+  try {
+    pipeline = buildPipeline(sourceNode.id);
+  } catch (error) {
+    toast(error.message, 'error');
+    setRunStatus('error', 'Graph tidak valid');
+    return;
+  }
   if (pipeline.length === 0) {
     toast('Hubungkan node Source URL ke node lain', 'error');
     return;
@@ -930,22 +967,46 @@ async function runPipeline() {
   }
 }
 
-// Build execution order from source node following edges
+// Build a topological execution order for nodes reachable from Source URL.
 function buildPipeline(startId) {
-  const visited = new Set();
-  const order = [];
+  const reachable = new Set([startId]);
   const queue = [startId];
   while (queue.length) {
     const id = queue.shift();
-    if (visited.has(id)) continue;
-    visited.add(id);
-    const node = state.nodes.find(n => n.id === id);
-    if (node && id !== startId) order.push(node);
-    state.edges
-      .filter(e => e.from === id)
-      .forEach(e => queue.push(e.to));
+    state.edges.filter(edge => edge.from === id).forEach(edge => {
+      if (!reachable.has(edge.to)) {
+        reachable.add(edge.to);
+        queue.push(edge.to);
+      }
+    });
   }
-  return order;
+
+  const indegree = new Map([...reachable].map(id => [id, 0]));
+  state.edges.forEach(edge => {
+    if (reachable.has(edge.from) && reachable.has(edge.to)) {
+      indegree.set(edge.to, (indegree.get(edge.to) || 0) + 1);
+    }
+  });
+
+  const ready = [...reachable].filter(id => indegree.get(id) === 0);
+  const orderedIds = [];
+  while (ready.length) {
+    const id = ready.shift();
+    orderedIds.push(id);
+    state.edges.filter(edge => edge.from === id && reachable.has(edge.to)).forEach(edge => {
+      indegree.set(edge.to, indegree.get(edge.to) - 1);
+      if (indegree.get(edge.to) === 0) ready.push(edge.to);
+    });
+  }
+
+  if (orderedIds.length !== reachable.size) {
+    throw new Error('Graph mengandung cycle. Hapus koneksi yang berputar terlebih dahulu.');
+  }
+
+  return orderedIds
+    .filter(id => id !== startId)
+    .map(id => state.nodes.find(node => node.id === id))
+    .filter(Boolean);
 }
 
 // ─── Pipeline Execution (simulate + real fetch via allorigins) ─
@@ -1298,16 +1359,16 @@ function renderOutput(url, results, pipeline) {
   // AI Prompt
   $('ai-prompt-content').textContent = state.output.aiPrompt;
 
-  // Assets tab
-  renderAssetsTab(results.assets || null);
-
-  // Skills tab — only update if skills were actually run
+  // Extra result tabs
+  renderAssetsTab(results.assets || []);
   if (results.skills) {
     renderSkillsTab(results.skills);
+  } else {
+    $('skills-panel').innerHTML = '<div class="empty-state"><p>Tambahkan node Skill Analysis dan jalankan pipeline</p></div>';
   }
 
-  // Title
-  outputTitle.textContent = `${pipeline.map(n => NODE_DEFS[n.type]?.label).join(' → ')} — ${safeHostname(url)}`;
+  // Reference output title
+  outputTitle.textContent = `Combined Extract · ${safeHostname(url)}`;
 
   // Switch to most relevant tab
   if (results.skills) {
@@ -1449,7 +1510,12 @@ function inlineFormat(text) {
 }
 
 function escHtml(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // ─── History ──────────────────────────────────────────────────
@@ -2114,22 +2180,24 @@ function renderSkillsTab(skillsResult) {
   applyTransform();
   renderHistory();
 
-  // Pre-populate a simple default pipeline for demo
+  // Reference-aligned seven-node starter workflow.
   setTimeout(() => {
-    const cx = canvas.getBoundingClientRect();
-    const srcNode = createNode('source-url', 60, 80);
-    const mdNode  = createNode('scrape-md',   320, 60);
-    const sgNode  = createNode('styleguide',  320, 180);
-    const aiNode  = createNode('ai-design',   580, 120);
+    const srcNode   = createNode('source-url', 40, 200);
+    const mdNode    = createNode('scrape-md', 340, 60);
+    const htmlNode  = createNode('scrape-html', 340, 180);
+    const imageNode = createNode('scrape-img', 340, 300);
+    const crawlNode = createNode('crawl', 340, 420);
+    const sgNode    = createNode('styleguide', 340, 540);
+    const aiNode    = createNode('ai-design', 680, 280);
 
-    if (srcNode && mdNode) {
-      addEdge(srcNode.id, mdNode.id);
-      addEdge(srcNode.id, sgNode.id);
-      addEdge(mdNode.id,  aiNode.id);
-      addEdge(sgNode.id,  aiNode.id);
-    }
+    [mdNode, htmlNode, imageNode, crawlNode, sgNode].forEach(node => {
+      if (srcNode && node) addEdge(srcNode.id, node.id);
+    });
+    [mdNode, htmlNode, imageNode, crawlNode, sgNode].forEach(node => {
+      if (node && aiNode) addEdge(node.id, aiNode.id);
+    });
 
     selectNode(null);
-    redrawEdges();
+    fitNodesToView();
   }, 50);
 })();
