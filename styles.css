@@ -1496,10 +1496,21 @@ a { color: var(--accent); text-decoration: none; }
     justify-content: flex-start;
   }
   .tab-btn { padding: 7px 8px; }
-  .tab-more-wrap { margin-left: auto; }
+  .tab-more-wrap {
+    position: static;
+    margin-left: auto;
+  }
   .tab-dropdown {
-    top: calc(100% + 2px);
-    right: 0;
+    top: calc(100% + 4px);
+    right: 6px;
+    left: 6px;
     z-index: 1000;
+    min-width: 0;
+    padding: 6px;
+  }
+  .tab-drop-item {
+    min-height: 40px;
+    padding: 10px 12px;
+    font-size: 12px;
   }
 }

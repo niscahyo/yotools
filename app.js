@@ -612,6 +612,7 @@ function activateTab(tabKey) {
   // Close dropdown
   $('tab-dropdown')?.classList.remove('open');
   $('tab-more-btn')?.classList.remove('open');
+  $('tab-more-btn')?.setAttribute('aria-expanded', 'false');
 }
 
 // Regular tab buttons
@@ -635,6 +636,7 @@ $('tab-more-btn')?.addEventListener('click', e => {
   const isOpen   = dropdown.classList.contains('open');
   dropdown.classList.toggle('open', !isOpen);
   moreBtn.classList.toggle('open', !isOpen);
+  moreBtn.setAttribute('aria-expanded', String(!isOpen));
 });
 
 // Close dropdown on outside click
@@ -642,6 +644,7 @@ document.addEventListener('click', e => {
   if (!$('tab-more-wrap')?.contains(e.target)) {
     $('tab-dropdown')?.classList.remove('open');
     $('tab-more-btn')?.classList.remove('open');
+    $('tab-more-btn')?.setAttribute('aria-expanded', 'false');
   }
 });
 
